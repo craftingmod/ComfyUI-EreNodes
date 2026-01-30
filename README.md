@@ -167,12 +167,14 @@ Special thanks to the amazing open-source community:
 - **[ComfyUI-PromptPalette](https://github.com/kambara/ComfyUI-PromptPalette)** - Initial inspiration and foundational code
 - **[ComfyUI-EZ-AF-Nodes](https://github.com/ez-af/ComfyUI-EZ-AF-Nodes)** - Prompt Gallery node inspiration
 - **[DraconicDragon](https://github.com/DraconicDragon)** - Comprehensive tag lists and data
+- **[Erehr](https://github.com/Erehr/ComfyUI-EreNodes)** - Project author
+- **[NyanTong](https://arca.live/u/@NyanTong/81553269)** - Translating danbooru.csv to Korean: [arca.live](https://arca.live/b/aiart/139793445)
 
 ---
 
 <div align="center">
 
-**⭐ If you find this project helpful, please consider giving it a star! ⭐**
+**⭐ If you find this project helpful, please consider giving it a star to [original repository](https://github.com/erehr/ComfyUI-EreNodes)! ⭐**
 
 [Report Bug](https://github.com/erehr/ComfyUI-EreNodes/issues) • [Request Feature](https://github.com/erehr/ComfyUI-EreNodes/issues) • [Discussions](https://github.com/erehr/ComfyUI-EreNodes/discussions)
 

@@ -1,12 +1,12 @@
 [project]
-name = "comfyui-erenodes"
+name = "comfyui-erenodes-korean"
 description = "A collection of prompt managent nodes with advanced tag parsing. Prompt tag cloud, mutiselect, toggle list, randomizer, filter, autocompete."
-version = "2.1.2"
+version = "2.1.3"
 license = { file = "LICENSE.txt" }
 dependencies  = []
 
 [project.urls]
-Repository = "https://github.com/Erehr/ComfyUI-EreNodes"
+Repository = "https://github.com/craftingmod/ComfyUI-EreNodes"
 
 [tool.comfy]
 PublisherId = "erehr"
