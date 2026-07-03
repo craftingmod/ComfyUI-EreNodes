@@ -565,6 +565,11 @@ if (typeof app !== "undefined") {
             const parentContextMenu = e.target.closest('.litecontextmenu');
             const isSearchBoxParent = parentContextMenu ? parentContextMenu.querySelector('.comfy-context-menu-filter') : false;
 
+            if (e.target.classList.contains("easyuse-anima-highlight-input")) {
+                // Duplicated autocomplete in custom node.
+                return
+            }
+ 
             if (
                 (!parentContextMenu || !isSearchBoxParent) && // Allow if not in a context menu OR if in one that ISN'T the TagContextMenuInsert's
                 !e.target.classList.contains('comfy-context-menu-filter') && // Explicitly don't attach to the searchbox itself via this listener
