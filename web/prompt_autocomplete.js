@@ -200,6 +200,7 @@ class GlobalAutocomplete {
         this.currentWord = "";
         this.currentWordStart = 0;
         this.onKeyDown = this.onKeyDown.bind(this);
+        this.onInput = this.onInput.bind(this);
         this.onBlur = this.onBlur.bind(this);
         this.onClick = this.onClick.bind(this);
     }
@@ -210,7 +211,7 @@ class GlobalAutocomplete {
         this.attachedElement = inputElement;
         this.helper = new TextAreaCaretHelper(inputElement);
         this.attachedElement.addEventListener("keydown", this.onKeyDown, true);
-        this.attachedElement.addEventListener("input", this.onInput.bind(this));
+        this.attachedElement.addEventListener("input", this.onInput);
         this.attachedElement.addEventListener("blur", this.onBlur);
         this.attachedElement.addEventListener("click", this.onClick);
     }
@@ -223,6 +224,10 @@ class GlobalAutocomplete {
             this.attachedElement.removeEventListener("click", this.onClick);
             this.attachedElement = null;
             this.helper = null;
+        }
+        if (this.debounce) {
+            clearTimeout(this.debounce);
+            this.debounce = null;
         }
         this.closeMenu();
     }
@@ -333,12 +338,24 @@ class GlobalAutocomplete {
         this.closeMenu();
     }
 
-    onBlur() {
+    onBlur(e) {
+        const blurredElement = e.currentTarget;
+
         // Use a small timeout to allow a click on the menu to register
         setTimeout(() => {
-            if (this.menu && this.menu.root && !this.menu.root.matches(':hover')) {
-                this.closeMenu();
+            if (this.attachedElement !== blurredElement) {
+                return;
             }
+
+            if (document.activeElement === blurredElement) {
+                return;
+            }
+
+            if (this.menu && this.menu.root && this.menu.root.matches(':hover')) {
+                return;
+            }
+
+            this.detach();
         }, 150);
     }
 
@@ -556,6 +573,11 @@ class GlobalAutocomplete {
 // This needs to be done after the class definition.
 if (typeof app !== "undefined") {
     app.globalAutocompleteInstance = new GlobalAutocomplete(); // Store on app for access
+
+    // Explicitly don't attach to the searchbox itself via this listener
+    const blacklistTags = ["easyuse-anima-highlight-input", "comfy-context-menu-filter"]
+    const blacklistParentSelectors = [".autocomplete-text-widget"]
+
     document.addEventListener("focusin", (e) => {
         if (!app.ui.settings.getSettingValue('EreNodes.Autocomplete.Global', true)) {
             return; // If the setting is disabled, do nothing.
@@ -564,23 +586,43 @@ if (typeof app !== "undefined") {
         if (e.target.tagName === "TEXTAREA") {
             const parentContextMenu = e.target.closest('.litecontextmenu');
             const isSearchBoxParent = parentContextMenu ? parentContextMenu.querySelector('.comfy-context-menu-filter') : false;
+            const blockedParent = blacklistParentSelectors.some(selector => e.target.closest(selector));
 
-            if (e.target.classList.contains("easyuse-anima-highlight-input")) {
-                // Duplicated autocomplete in custom node.
+
+            // Allow if not in a context menu OR if in one that ISN'T the TagContextMenuInsert's
+            if (parentContextMenu && isSearchBoxParent) {
                 return
             }
- 
-            if (
-                (!parentContextMenu || !isSearchBoxParent) && // Allow if not in a context menu OR if in one that ISN'T the TagContextMenuInsert's
-                !e.target.classList.contains('comfy-context-menu-filter') && // Explicitly don't attach to the searchbox itself via this listener
-                (!app.globalAutocompleteInstance.textarea || app.globalAutocompleteInstance.textarea !== e.target) // Only attach if not already attached or attached to a different element
-            ) {
-                // prompt_autocomplete.js:544 
-                // Uncaught ReferenceError: triggerImmediately is not defined
-                app.globalAutocompleteInstance.attach(e.target)
-                // Attach with default behavior for global textareas
-                // app.globalAutocompleteInstance.attach(e.target, null, new Set(), e.target, "", triggerImmediately);
+
+            if (blockedParent) {
+                return
             }
+            
+            // If EasyUseAnima autocomplete input, skip.
+            if (e.target["__easyuseAnimaAutocomplete"] === true) {
+                return
+            }
+
+            const classList = e.target.classList
+            for (const blacklistTag of blacklistTags) {
+                if (classList == null) {
+                    break
+                }
+                if (classList.contains(blacklistTag)) {
+                    return
+                }
+            }
+
+            if (app.globalAutocompleteInstance.attachedElement === e.target) {
+                return
+            }
+
+            // prompt_autocomplete.js:544 
+            // Uncaught ReferenceError: triggerImmediately is not defined
+            app.globalAutocompleteInstance.attach(e.target)
+            // Attach with default behavior for global textareas
+            // app.globalAutocompleteInstance.attach(e.target, null, new Set(), e.target, "", triggerImmediately);
+
         }
     });
 }
