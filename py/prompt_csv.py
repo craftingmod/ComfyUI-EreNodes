@@ -4,12 +4,48 @@ import csv
 import threading
 from collections import OrderedDict
 import server
+import folder_paths
 from aiohttp import web
 
 from .settings import get_erenodes_settings
 
 # Define constants for export
 CSV_FILES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "__autocomplete__")
+
+# Return the update-safe user autocomplete directory.
+def get_user_csv_files_path():
+    try:
+        user_path = folder_paths.get_user_directory()
+    except AttributeError:  # Older ComfyUI versions have no user directory helper.
+        user_path = os.path.join(
+            getattr(folder_paths, "base_path", os.path.dirname(CSV_FILES_PATH)),
+            "user",
+        )
+    return os.path.join(user_path, "__erenodes", "autocomplete")
+
+# Resolve a selectable CSV, preferring the bundled file on name collision.
+def get_csv_path(csv_file):
+    if not isinstance(csv_file, str) or csv_file != os.path.basename(csv_file) or not csv_file.lower().endswith(".csv"):
+        return None
+
+    for directory in (CSV_FILES_PATH, get_user_csv_files_path()):
+        path = os.path.join(directory, csv_file)
+        if os.path.isfile(path):
+            return path
+    return None
+
+# List bundled and user CSVs as one stable filename namespace.
+def list_csv_files():
+    files = []
+    for directory in (CSV_FILES_PATH, get_user_csv_files_path()):
+        if os.path.isdir(directory):
+            files.extend(
+                filename for filename in os.listdir(directory)
+                if filename.lower().endswith(".csv")
+            )
+    return sorted(set(files), key=str.casefold)
+
+
 # utf-8-sig: several community tag files carry a BOM, which would make the first row's tag read as "\ufeff1girl" — unmatchable, and always the highest-count one.
 DEFAULT_ENCODING = 'utf-8-sig'
 TAG_TYPES = {
@@ -74,8 +110,8 @@ def _is_header(row):
 def get_filter_maps(csv_file):
     if not csv_file:
         return None
-    csv_path = os.path.join(CSV_FILES_PATH, csv_file)
-    if not os.path.isfile(csv_path):
+    csv_path = get_csv_path(csv_file)
+    if csv_path is None:
         return None
     try:
         mtime = os.path.getmtime(csv_path)
@@ -161,8 +197,8 @@ def get_tag_data(active_csv=None):
     if cached is not None:
         return cached
 
-    csv_path = os.path.join(CSV_FILES_PATH, active_csv)
-    if not os.path.isfile(csv_path):
+    csv_path = get_csv_path(active_csv)
+    if csv_path is None:
         # Missing or unreadable: nothing to search, and nothing worth caching.
         return []
 
