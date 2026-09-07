@@ -2,6 +2,7 @@ import asyncio
 import os
 import csv
 import threading
+from collections import OrderedDict
 import server
 from aiohttp import web
 
@@ -19,7 +20,7 @@ TAG_TYPES = {
     5: "Meta"
 }
 
-# csv_file -> (mtime, tags), keyed by name so /erenodes/set_setting can drop one entry and stamped with mtime so an edited CSV is noticed.
+# csv_file -> tags, keyed by name so /erenodes/set_setting can drop one entry.
 TAG_DATA_CACHE = {}
 
 # Parsing 320k rows takes a couple of seconds, and without this two searches arriving together on a cold cache both pay for it.
@@ -27,6 +28,23 @@ _TAG_DATA_LOCK = threading.Lock()
 
 # (csv_file -> (mtime, (tag_set, alias_map))) used by the Prompt Filter node
 FILTER_MAP_CACHE = {}
+
+# Short-lived cache for repeated autocomplete queries, such as typing a
+# character and then deleting it again.
+_SEARCH_CACHE_MAX = 32
+_SEARCH_CACHE = OrderedDict()
+_SEARCH_CACHE_LOCK = threading.Lock()
+
+
+def _clear_search_cache(csv_file=None):
+    with _SEARCH_CACHE_LOCK:
+        if csv_file is None:
+            _SEARCH_CACHE.clear()
+            return
+
+        for key in list(_SEARCH_CACHE):
+            if key[0] == csv_file:
+                _SEARCH_CACHE.pop(key, None)
 
 
 # Yield data rows, skipping a header line if the file has one.
@@ -99,6 +117,7 @@ def invalidate_csv_caches(csv_file):
 
     with _TAG_DATA_LOCK:
         TAG_DATA_CACHE.pop(csv_file, None)
+    _clear_search_cache(csv_file)
     FILTER_MAP_CACHE.pop(csv_file, None)
 
 def load_tags_from_csv(csv_path):
@@ -126,39 +145,52 @@ def load_tags_from_csv(csv_path):
 
     return tags
 
-# The active CSV, parsed and cached.
+# The active CSV, parsed and cached. Cache invalidation is driven by the
+# autocomplete setting and process restart; Prompt Filter has its own mtime
+# based cache because it accepts a CSV per node execution.
 # Blocking: the merged danbooru+e621 file is ~320k rows and a couple of seconds, so call it from a thread, never on the event loop.
-def get_tag_data():
-    settings = get_erenodes_settings()
-    active_csv = settings.get('autocomplete.csv')
+def get_tag_data(active_csv=None):
+    if active_csv is None:
+        settings = get_erenodes_settings()
+        active_csv = settings.get('autocomplete.csv')
 
     if not active_csv:
         return []
 
+    cached = TAG_DATA_CACHE.get(active_csv)
+    if cached is not None:
+        return cached
+
     csv_path = os.path.join(CSV_FILES_PATH, active_csv)
-    try:
-        mtime = os.path.getmtime(csv_path)
-    except OSError:
+    if not os.path.isfile(csv_path):
         # Missing or unreadable: nothing to search, and nothing worth caching.
         return []
-
-    cached = TAG_DATA_CACHE.get(active_csv)
-    if cached and cached[0] == mtime:
-        return cached[1]
 
     with _TAG_DATA_LOCK:
         # Another thread may have loaded it while this one waited.
         cached = TAG_DATA_CACHE.get(active_csv)
-        if cached and cached[0] == mtime:
-            return cached[1]
+        if cached is not None:
+            return cached
         tags = load_tags_from_csv(csv_path)
-        TAG_DATA_CACHE[active_csv] = (mtime, tags)
+        TAG_DATA_CACHE[active_csv] = tags
+        _clear_search_cache(active_csv)
     return tags
 
 # Substring match over tag names and their aliases, in file order, so that "eyes" finds `blue eyes`.
 # The CSVs are sorted by post count descending, so breaking at `limit` stops early and hands back the highest-count matches; input that matches little or nothing walks the whole file for ~50ms.
 def _search_tags(query, limit):
-    all_tags = get_tag_data()
+    active_csv = get_erenodes_settings().get('autocomplete.csv')
+    if not active_csv:
+        return []
+
+    cache_key = (active_csv, query, limit)
+    with _SEARCH_CACHE_LOCK:
+        cached = _SEARCH_CACHE.get(cache_key)
+        if cached is not None:
+            _SEARCH_CACHE.move_to_end(cache_key)
+            return list(cached)
+
+    all_tags = get_tag_data(active_csv)
 
     results = []
     seen_tags = set()
@@ -189,6 +221,12 @@ def _search_tags(query, limit):
                 'aliases': aliases,
             })
             seen_tags.add(tag_name)
+
+    with _SEARCH_CACHE_LOCK:
+        _SEARCH_CACHE[cache_key] = results
+        _SEARCH_CACHE.move_to_end(cache_key)
+        while len(_SEARCH_CACHE) > _SEARCH_CACHE_MAX:
+            _SEARCH_CACHE.popitem(last=False)
 
     return results
 
