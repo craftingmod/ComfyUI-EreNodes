@@ -21,7 +21,17 @@ def get_user_csv_files_path():
             getattr(folder_paths, "base_path", os.path.dirname(CSV_FILES_PATH)),
             "user",
         )
-    return os.path.join(user_path, "__erenodes", "autocomplete")
+
+    path = os.path.join(user_path, "__erenodes", "autocomplete")
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError as e:
+        print(f"[EreNodes] Could not create autocomplete folder '{path}': {e}")
+    return path
+
+
+# Create the user folder during node startup, before the first CSV lookup.
+get_user_csv_files_path()
 
 # Resolve a selectable CSV, preferring the bundled file on name collision.
 def get_csv_path(csv_file):
