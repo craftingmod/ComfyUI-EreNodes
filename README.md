@@ -133,7 +133,7 @@ git clone https://github.com/erehr/ComfyUI-EreNodes.git
 
 ### Quick Setup
 
-1. **Custom Autocomplete**: Place bundled CSV files in the `__autocomplete__` folder within the EreNodes directory. For CSVs that must survive node updates, use `ComfyUI/user/__erenodes/autocomplete`, then choose the file in Settings.
+1. **Custom Autocomplete**: Place bundled CSV files in the `__autocomplete__` folder within the EreNodes directory. For custom CSVs, place them in `ComfyUI/user/__erenodes/autocomplete` and choose the file in Settings; this folder is created automatically.
 2. **Preview Images**: Add preview images to enhance your tag browsing experience
 3. **Create Your First Tag Group**: Use any EreNodes prompt node to save your favorite tag combinations
 
