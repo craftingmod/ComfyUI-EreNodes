@@ -91,6 +91,16 @@ def get_filter_maps(csv_file):
     FILTER_MAP_CACHE[csv_file] = (mtime, result)
     return result
 
+
+# Drop cached data for one CSV so the next use reloads it.
+def invalidate_csv_caches(csv_file):
+    if not csv_file:
+        return
+
+    with _TAG_DATA_LOCK:
+        TAG_DATA_CACHE.pop(csv_file, None)
+    FILTER_MAP_CACHE.pop(csv_file, None)
+
 def load_tags_from_csv(csv_path):
     tags = []
     if csv_path and os.path.isfile(csv_path):

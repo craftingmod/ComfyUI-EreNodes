@@ -8,7 +8,7 @@ import server
 import folder_paths
 from aiohttp import web
 from safetensors import safe_open
-from .prompt_csv import CSV_FILES_PATH, TAG_DATA_CACHE
+from .prompt_csv import CSV_FILES_PATH, invalidate_csv_caches
 from .settings import get_erenodes_settings, save_erenodes_settings
 from . import paths
 from . import images
@@ -59,12 +59,14 @@ async def set_setting_handler(request):
         return web.json_response({"status": "error", "message": "Not an available CSV file"}, status=400)
 
     settings = get_erenodes_settings()
+    previous_value = settings.get(key)
     settings[key] = value
     save_erenodes_settings(settings)
 
-    # Invalidate the tag cache so it lazy-reloads on the next search.
+    # Invalidate both the previous and selected CSV so it lazy-reloads on the next search.
     if key == "autocomplete.csv":
-        TAG_DATA_CACHE.pop(value, None)
+        invalidate_csv_caches(previous_value)
+        invalidate_csv_caches(value)
 
     return web.json_response({"status": "ok"})
 
