@@ -117,11 +117,8 @@ def load_tags_from_csv(csv_path):
                         if len(row) >= 4 and row[3]:
                             aliases = [a.strip().lower().replace('_', ' ') for a in row[3].split(',') if a.strip()]
 
-                        tags.append({
-                            'name': name,
-                            'count': count,
-                            'aliases': aliases
-                        })
+                        # Append as simple
+                        tags.append((name, count, aliases))
                     except (ValueError, IndexError):
                         continue
         except Exception:
@@ -166,11 +163,10 @@ def _search_tags(query, limit):
     results = []
     seen_tags = set()
 
-    for tag in all_tags:
+    for tag_name, count, aliases in all_tags:
         if len(results) >= limit:
             break
 
-        tag_name = tag.get('name')
         if not tag_name or tag_name in seen_tags:
             continue
 
@@ -180,13 +176,18 @@ def _search_tags(query, limit):
             match_found = True
         
         if not match_found:
-            for alias in tag.get('aliases', []):
+            for alias in aliases:
                 if query in alias:
                     match_found = True
                     break
         
         if match_found:
-            results.append(tag)
+            # Convert only matched results as dict
+            results.append({
+                'name': tag_name,
+                'count': count,
+                'aliases': aliases,
+            })
             seen_tags.add(tag_name)
 
     return results
